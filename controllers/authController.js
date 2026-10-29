@@ -24,17 +24,17 @@ export const sendOTP = async (req, res) => {
     }
 
     // Find an existing user with this phone number
-    const existingUser = await User.findOne({ phoneNumber });
+    const existingUser = await User.findOne({ phone: phoneNumber });
 
     // Generate OTP
     const otp = generateOTP();
 
     // Remove previous OTP records for this phone number
-    await OTP.deleteMany({ phoneNumber });
+    await OTP.deleteMany({ phone: phoneNumber });
 
     // Save hashed OTP with a 5-minute expiration
     await OTP.create({
-      phoneNumber,
+      phone: phoneNumber,
       otpHash: hashOTP(otp),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       attempts: 0,
@@ -78,7 +78,7 @@ export const verifyOTP = async (req, res) => {
       });
     }
 
-    const otpRecord = await OTP.findOne({ phoneNumber });
+    const otpRecord = await OTP.findOne({ phone: phoneNumber });
 
     if (!otpRecord) {
       return res.status(400).json({
@@ -120,11 +120,11 @@ export const verifyOTP = async (req, res) => {
     await OTP.deleteOne({ _id: otpRecord._id });
 
     // Find existing user or create a new customer
-    let user = await User.findOne({ phoneNumber });
+    let user = await User.findOne({ phone: phoneNumber });
 
     if (!user) {
       user = await User.create({
-        phoneNumber,
+        phone: phoneNumber,
         role: "user",
       });
     }
@@ -148,13 +148,15 @@ export const verifyOTP = async (req, res) => {
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+    user.isPhoneVerified = true;
+    await user.save();
 
     return res.status(200).json({
       success: true,
       message: "Phone verified successfully",
       user: {
         id: user._id,
-        phoneNumber: user.phoneNumber,
+        phone: user.phone,
         role: user.role,
       },
     });
